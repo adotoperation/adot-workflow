@@ -120,15 +120,27 @@ const Login = ({ onLoginSuccess, initialUser = null, isEditMode = false, onCance
       };
       registerUser();
     } else {
-      // Login simulation (Keep for now or implement /api/login later)
-      setTimeout(() => {
-        onLoginSuccess({ 
-          userId, 
-          name: name || userId, 
-          team: team || '운영팀' 
-        });
-        setLoading(false);
-      }, 500);
+      // Actual Login implementation
+      const loginUser = async () => {
+        try {
+          const response = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, password }),
+          });
+          const result = await response.json();
+          if (result.status === 'success') {
+            onLoginSuccess(result.data);
+          } else {
+            setError(result.message || '로그인 실패');
+          }
+        } catch (err) {
+          setError(`로그인 중 오류가 발생했습니다: ${err.message}`);
+        } finally {
+          setLoading(false);
+        }
+      };
+      loginUser();
     }
   };
 

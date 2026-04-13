@@ -366,6 +366,34 @@ def check_id():
         print(f"[ERROR] ID check failed: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@app.route('/api/login', methods=['POST'])
+def login():
+    try:
+        data = request.json
+        user_id = data.get('userId')
+        password = data.get('password')
+        
+        client = get_gspread_client()
+        sheet = client.open_by_key(SPREADSHEET_ID).worksheet("회원정보")
+        all_data = sheet.get_all_values()
+        
+        # A: 팀명(0), B: 이름(1), C: 아이디(2), D: 비밀번호(3), E: 사내 이메일(4)
+        for row in all_data[1:]: # Skip header
+             if len(row) >= 4 and row[2] == user_id and row[3] == password:
+                 return jsonify({
+                     "status": "success",
+                     "data": {
+                         "team": row[0],
+                         "name": row[1],
+                         "userId": user_id
+                     }
+                 })
+                 
+        return jsonify({"status": "error", "message": "아이디 또는 비밀번호가 일치하지 않습니다."}), 401
+    except Exception as e:
+        print(f"[ERROR] Login failed: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 # Vercel requires the app instance to be named 'app'
 if __name__ == '__main__':
     app.run(port=5001, debug=True)
