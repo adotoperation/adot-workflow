@@ -263,13 +263,24 @@ const WorkflowAppGolden = ({ user, initialData, onBack }) => {
 };
 
 export default function App() {
-  const [view, setView] = useState(VIEW_LOGIN);
-  const [user, setUser] = useState(null);
+  const getInitialUser = () => {
+    try {
+      const savedUser = localStorage.getItem('adot_user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const initialUser = getInitialUser();
+  const [user, setUser] = useState(initialUser);
+  const [view, setView] = useState(initialUser ? VIEW_DASHBOARD : VIEW_LOGIN);
   const [editingWorkflow, setEditingWorkflow] = useState(null);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
+    localStorage.setItem('adot_user', JSON.stringify(userData)); // 브라우저에 저장
     setView(VIEW_DASHBOARD);
     setIsEditingProfile(false);
   };
@@ -301,6 +312,7 @@ export default function App() {
 
   const handleLogout = () => {
     setUser(null);
+    localStorage.removeItem('adot_user'); // 브라우저 저장 정보 삭제
     setView(VIEW_LOGIN);
     setIsEditingProfile(false);
   };
