@@ -130,6 +130,11 @@ const Login = ({ onLoginSuccess, initialUser = null, isEditMode = false, onCance
           });
           const result = await response.json();
           if (result.status === 'success') {
+            if (rememberMe) {
+              localStorage.setItem('savedUserId', userId);
+            } else {
+              localStorage.removeItem('savedUserId');
+            }
             onLoginSuccess(result.data);
           } else {
             setError(result.message || '로그인 실패');
