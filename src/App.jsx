@@ -145,9 +145,9 @@ const WorkflowAppGolden = ({ user, initialData, onBack }) => {
           <button className="btn-header-save" onClick={async () => {
             try {
               const flowData = JSON.stringify({ nodes, edges });
-              await fetch(SCRIPT_URL, { 
+              const response = await fetch(SCRIPT_URL, { 
                 method: 'POST', 
-                mode: 'cors', 
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                   action: 'saveWorkflow', 
                   userId: user.userId, 
@@ -156,8 +156,16 @@ const WorkflowAppGolden = ({ user, initialData, onBack }) => {
                   flowData 
                 }) 
               });
-              alert('성공적으로 저장되었습니다!');
-            } catch (err) { alert('동기화 실패'); }
+              
+              const result = await response.json();
+              if (response.ok && result.status === 'success') {
+                alert('성공적으로 저장되었습니다!');
+              } else {
+                alert(`저장 실패: ${result.message || '알 수 없는 오류가 발생했습니다.'}`);
+              }
+            } catch (err) { 
+              alert(`서버 연결 오류: ${err.message}`); 
+            }
           }}><Save size={16} /> 저장하기</button>
           <button className="btn-header-primary" onClick={() => {
             if (reactFlowWrapper.current) {

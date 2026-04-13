@@ -44,20 +44,33 @@ def save_workflow():
     try:
         data = request.json
         # Handle both direct JSON and GAS-style wrapper
-        if 'action' in data and data['action'] == 'saveWorkflow':
+        if data.get('action') == 'saveWorkflow':
             user_id = data.get('userId', 'default')
-            workflow_id = data.get('workflowId', f"WF-{int(datetime.now().timestamp())}") # Fallback to timestamp ID
+            workflow_id = data.get('workflowId', f"WF-{int(datetime.now().timestamp())}")
             job_name = data.get('jobName', 'untitled')
             flow_data = data.get('flowData') 
         else:
-            return jsonify({"status": "error", "message": "Invalid action"}), 400
+            return jsonify({"status": "error", "message": f"Unsupported action: {data.get('action')}"}), 400
 
-        # Sync to Google Sheets (Primary Storage in Cloud)
-        client = get_gspread_client()
-        sheet = client.open_by_key(SPREADSHEET_ID).worksheet(WORKSHEET_NAME)
+        # Sync to Google Sheets
+        try:
+            client = get_gspread_client()
+            sheet = client.open_by_key(SPREADSHEET_ID).worksheet(WORKSHEET_NAME)
+        except Exception as auth_err:
+            print(f"[AUTH ERROR] Google Sheet connection failed: {str(auth_err)}")
+            return jsonify({"status": "error", "message": f"Google Sheets connection failed: {str(auth_err)}"}), 503
         
-        # Parse flow data
-        flow_json = json.loads(flow_data) if isinstance(flow_data, str) else flow_data
+        # Parse flow data (handle string or dict)
+        try:
+            if isinstance(flow_data, str):
+                # Replace potential single quotes if it's not a valid JSON string (common in manual tests)
+                # but App.jsx uses JSON.stringify, so it should be fine.
+                flow_json = json.loads(flow_data)
+            else:
+                flow_json = flow_data
+        except Exception as json_err:
+            print(f"[JSON ERROR] Failed to parse flow_data: {str(json_err)}\nData: {flow_data}")
+            return jsonify({"status": "error", "message": f"Invalid flow data format: {str(json_err)}"}), 400
         nodes = flow_json.get('nodes', [])
         
         # Format date as YYYY-MM-DD per user request
