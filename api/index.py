@@ -224,6 +224,8 @@ def load_workflow():
             
             if is_match:
                 wf_id_found = row[1]
+                job_name_found = row[3] if len(row) >= 4 else None # Extract real jobName from sheet [NEW]
+                
                 # Check for Master JSON in Column P (index 15)
                 if len(row) > 15 and row[15] and not wf_data_from_json:
                     try:
@@ -269,7 +271,7 @@ def load_workflow():
             return jsonify({
                 "status": "success", 
                 "data": {
-                    "jobName": job_name,
+                    "jobName": job_name_found, # Use the actual extracted jobName
                     "workflowId": wf_id_found,
                     "flowData": final_flow_data
                 }
