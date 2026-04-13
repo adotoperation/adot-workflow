@@ -145,7 +145,17 @@ const WorkflowAppGolden = ({ user, initialData, onBack }) => {
           <button className="btn-header-save" onClick={async () => {
             try {
               const flowData = JSON.stringify({ nodes, edges });
-              await fetch(SCRIPT_URL, { method: 'POST', mode: 'cors', body: JSON.stringify({ action: 'saveWorkflow', userId: user.userId, jobName: workflowName, flowData }) });
+              await fetch(SCRIPT_URL, { 
+                method: 'POST', 
+                mode: 'cors', 
+                body: JSON.stringify({ 
+                  action: 'saveWorkflow', 
+                  userId: user.userId, 
+                  workflowId: initialData?.workflowId || 'WF-' + Date.now(),
+                  jobName: workflowName, 
+                  flowData 
+                }) 
+              });
               alert('성공적으로 저장되었습니다!');
             } catch (err) { alert('동기화 실패'); }
           }}><Save size={16} /> 저장하기</button>
@@ -257,7 +267,8 @@ export default function App() {
   };
 
   const handleCreateNew = () => {
-    setEditingWorkflow({ name: '(제목없음)', nodes: [], edges: [] });
+    const newId = 'WF-' + Date.now();
+    setEditingWorkflow({ name: '(제목없음)', workflowId: newId, nodes: [], edges: [] });
     setView(VIEW_EDITOR);
   };
 
@@ -267,7 +278,11 @@ export default function App() {
       const result = await response.json();
       if (result.status === 'success') {
         const flowData = JSON.parse(result.data.flowData);
-        setEditingWorkflow({ name: jobName, ...flowData });
+        setEditingWorkflow({ 
+          name: jobName, 
+          workflowId: result.data.workflowId, 
+          ...flowData 
+        });
         setView(VIEW_EDITOR);
       }
     } catch (err) {
