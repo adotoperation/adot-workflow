@@ -60,37 +60,62 @@ def save_workflow():
             print(f"[AUTH ERROR] Google Sheet connection failed: {str(auth_err)}")
             return jsonify({"status": "error", "message": f"Google Sheets connection failed: {str(auth_err)}"}), 503
         
-        # Parse flow data (handle string or dict)
+        # Parse flow data
         try:
             if isinstance(flow_data, str):
-                # Replace potential single quotes if it's not a valid JSON string (common in manual tests)
-                # but App.jsx uses JSON.stringify, so it should be fine.
                 flow_json = json.loads(flow_data)
             else:
                 flow_json = flow_data
         except Exception as json_err:
             print(f"[JSON ERROR] Failed to parse flow_data: {str(json_err)}\nData: {flow_data}")
             return jsonify({"status": "error", "message": f"Invalid flow data format: {str(json_err)}"}), 400
-        nodes = flow_json.get('nodes', [])
         
-        # Format date as YYYY-MM-DD per user request
+        nodes = flow_json.get('nodes', [])
+        edges = flow_json.get('edges', [])
+        
+        # Format date as YYYY-MM-DD
         timestamp = datetime.now().strftime('%Y-%m-%d')
         
         rows = []
+        
+        # 1. Process Nodes
         for node in nodes:
             node_data = node.get('data', {})
+            pos = node.get('position', {'x': 0, 'y': 0})
             row = [
-                timestamp,      # 저장시간 (연-월-일)
-                workflow_id,    # 워크플로우 아이디
-                user_id,        # 사용자 아이디
-                job_name,       # 제목
-                node.get('id'),
-                node.get('type'),
-                node_data.get('label', ''),
-                node_data.get('team', ''),
-                node_data.get('person', ''),
-                node_data.get('method', node_data.get('applicant', '')),
-                node_data.get('automation', '수동')
+                timestamp,      # A: 저장시간
+                workflow_id,    # B: 워크플로우 아이디
+                user_id,        # C: 사용자 아이디
+                job_name,       # D: 제목
+                node.get('id'), # E: 노드 ID
+                node.get('type'), # F: 노드 타입
+                node_data.get('label', ''), # G: 라벨
+                node_data.get('team', ''),  # H: 팀
+                node_data.get('person', ''),# I: 담당자
+                node_data.get('method', node_data.get('applicant', '')), # J: 방법/신청자
+                node_data.get('automation', '수동'), # K: 자동화
+                str(node_data.get('isStar', False)), # L: 고객접점여부 [NEW]
+                str(pos.get('x', 0)), # M: 위치 X [NEW]
+                str(pos.get('y', 0)), # N: 위치 Y [NEW]
+                "" # O: Target (Edges 전용)
+            ]
+            rows.append(row)
+
+        # 2. Process Edges
+        for edge in edges:
+            edge_data = edge.get('data', {})
+            row = [
+                timestamp,      # A: 저장시간
+                workflow_id,    # B: 워크플로우 아이디
+                user_id,        # C: 사용자 아이디
+                job_name,       # D: 제목
+                edge.get('id'), # E: 엣지 ID
+                "edge",         # F: 타입 고정
+                edge.get('source', ''), # G: Source ID [NEW]
+                edge.get('target', ''), # H: Target ID [NEW]
+                edge_data.get('method', ''), # I: 전달수단
+                edge_data.get('automation', '수동'), # J: 자동화 여부
+                "", "", "", "", "" # 나머지 공백
             ]
             rows.append(row)
 
@@ -98,7 +123,7 @@ def save_workflow():
             sheet.append_rows(rows)
             return jsonify({
                 "status": "success", 
-                "message": f"Successfully synced {len(rows)} nodes with Workflow ID {workflow_id}"
+                "message": f"Successfully synced {len(nodes)} nodes and {len(edges)} edges with Workflow ID {workflow_id}"
             })
         
         return jsonify({"status": "error", "message": "No nodes to sync"}), 400
@@ -136,38 +161,54 @@ def load_workflow():
                         }
             return jsonify({"status": "success", "data": workflows})
 
-        # Load specific workflow nodes
+        rows = sheet.get_all_values()
         nodes = []
-        workflow_id = None
-        for row in all_rows:
-            if len(row) >= 11 and row[2] == user_id and row[3] == job_name:
-                workflow_id = row[1]
-                node = {
-                    "id": row[4],
-                    "type": row[5],
-                    "data": {
-                        "label": row[6],
-                        "team": row[7],
-                        "person": row[8],
-                        "method": row[9],
-                        "automation": row[10]
-                    },
-                    "position": {"x": 850, "y": 350} 
-                }
-                nodes.append(node)
+        edges = []
         
-        if not nodes:
+        # Filter by userId and jobName (Column C and D)
+        for row in rows[1:]: # Skip header
+            if len(row) >= 11 and row[2] == user_id and row[3] == job_name:
+                type_val = row[5] # Column F
+                
+                if type_val == "edge":
+                    edge = {
+                        "id": row[4],
+                        "type": "smoothstep",
+                        "source": row[6],
+                        "target": row[7],
+                        "label": row[8],
+                        "data": { "method": row[8], "automation": row[9] },
+                        "style": { "stroke": "#3b82f6" if row[9] == "자동" else "#fbbf24" if row[9] == "반자동" else "#ef4444", "strokeWidth": 4 }
+                    }
+                    edges.append(edge)
+                else:
+                    x_val = float(row[12]) if len(row) > 12 and row[12] else 0
+                    y_val = float(row[13]) if len(row) > 13 and row[13] else 0
+                    is_star_val = row[11].lower() == 'true' if len(row) > 11 else False
+                    
+                    node = {
+                        "id": row[4],
+                        "type": type_val,
+                        "position": {"x": x_val, "y": y_val},
+                        "data": {
+                            "label": row[6], "team": row[7], "person": row[8],
+                            "method": row[9], "automation": row[10], "isStar": is_star_val
+                        }
+                    }
+                    if type_val == 'node_trigger':
+                        node['data']['applicant'] = row[9]
+                    nodes.append(node)
+        
+        if nodes:
+            return jsonify({
+                "status": "success", 
+                "data": {
+                    "jobName": job_name,
+                    "flowData": json.dumps({"nodes": nodes, "edges": edges})
+                }
+            })
+        else:
             return jsonify({"status": "error", "message": "Workflow not found"}), 404
-
-        # Return reconstructed flow data
-        return jsonify({
-            "status": "success",
-            "data": {
-                "jobName": job_name,
-                "workflowId": workflow_id,
-                "flowData": json.dumps({"nodes": nodes, "edges": []})
-            }
-        })
         
     except Exception as e:
         print(f"[ERROR] Load failed: {str(e)}")
