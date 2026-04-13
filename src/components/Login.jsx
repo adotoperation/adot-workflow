@@ -36,10 +36,10 @@ const Login = ({ onLoginSuccess, initialUser = null, isEditMode = false, onCance
       if (result.status === 'success') {
         setTeams(result.data);
       } else {
-        setError('팀 목록을 불러오지 못했습니다.');
+        setError(`팀 목록 로드 실패: ${result.message || '알 수 없는 오류'}`);
       }
     } catch (err) {
-      setError('서버 연결 실패: 팀 목록을 불러올 수 없습니다.');
+      setError(`서버 연결 실패: ${err.message}`);
     } finally {
       setFetchingTeams(false);
     }

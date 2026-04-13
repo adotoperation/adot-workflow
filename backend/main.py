@@ -141,8 +141,14 @@ def get_teams():
         teams = sheet.col_values(1)[1:] 
         
         return jsonify({"status": "success", "data": teams})
+    except gspread.exceptions.WorksheetNotFound:
+        print(f"[ERROR] Worksheet '팀명' not found in spreadsheet {SPREADSHEET_ID}")
+        return jsonify({"status": "error", "message": "'팀명' 시트를 찾을 수 없습니다. 시트 이름을 확인해 주세요."}), 404
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        print(f"[ERROR] Unexpected error fetching teams: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"status": "error", "message": f"데이터 로드 실패: {str(e)}"}), 500
 
 if __name__ == '__main__':
     # Listen on all interfaces to allow internal host access
