@@ -24,10 +24,17 @@ def get_gspread_client():
         key_data = json.loads(google_key_json)
         creds = ServiceAccountCredentials.from_json_keyfile_dict(key_data, scope)
     else:
-        # Fallback to local file
-        key_file = os.path.join(os.path.dirname(__file__), '..', 'backend', 'google-key.json')
+        # Fallback to local file with absolute path resolution
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+        key_file = os.path.join(base_dir, 'backend', 'google-key.json')
+        
         if not os.path.exists(key_file):
-            raise FileNotFoundError("Google credentials not found in environment or local file.")
+            # Try same directory as a last resort
+            key_file = os.path.join(base_dir, 'google-key.json')
+            
+        if not os.path.exists(key_file):
+            raise FileNotFoundError(f"Google credentials not found. Checked: {key_file}")
+            
         creds = ServiceAccountCredentials.from_json_keyfile_name(key_file, scope)
         
     return gspread.authorize(creds)

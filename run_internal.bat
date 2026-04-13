@@ -18,7 +18,7 @@ pip install -r backend\requirements.txt
 echo [4/4] Starting Internal Host (Backend + Frontend)...
 
 :: Start backend in a new window
-start "Adot-Workflow Backend" cmd /k "echo Starting Backend... && cd backend && ..\backend\venv\Scripts\activate && python main.py"
+start "Adot-Workflow Backend" cmd /k "echo Starting Serverless Backend... && .\backend\venv\Scripts\activate && python api/index.py"
 
 :: Start frontend in current window
 echo [INFO] Starting Frontend...
