@@ -73,24 +73,37 @@ def save_workflow():
         nodes = flow_json.get('nodes', [])
         edges = flow_json.get('edges', [])
         
-        # Cleanup PREVIOUS version of this workflowId to prevent duplicates [Robust Addition]
+        # Cleanup PREVIOUS version of this workflowId efficiently [Emergency Performance Fix]
         try:
             all_data = sheet.get_all_values()
-            # Find row indices to delete (Column B is index 1)
-            # We iterate in reverse to avoid index shifting during deletion
-            indices_to_delete = []
-            for idx, row in enumerate(all_data):
-                if len(row) > 1 and row[1] == workflow_id:
-                    indices_to_delete.append(idx + 1) # gspread is 1-indexed
+            # Find row indices to delete (Column B is index 1, 0-indexed column 1)
+            indices = [i + 1 for i, row in enumerate(all_data) if len(row) > 1 and row[1] == workflow_id]
             
-            if indices_to_delete:
-                # Group contiguous indices if possible, or delete one by one in reverse
-                # For simplicity and reliability with smaller datasets:
-                for idx in reversed(indices_to_delete):
-                    sheet.delete_rows(idx)
-                print(f"[DEBUG] Cleaned up {len(indices_to_delete)} old rows for WF ID: {workflow_id}")
+            if indices:
+                # Group contiguous indices to minimize API calls
+                requests = []
+                # Sort indices in reverse to delete from bottom up
+                indices.sort(reverse=True)
+                
+                # Use batch_update to delete all matching rows in ONE request
+                # To prevent index shifting issues in a single batch, we create multiple deleteDimension requests
+                for idx in indices:
+                    requests.append({
+                        "deleteDimension": {
+                            "range": {
+                                "sheetId": sheet.id,
+                                "dimension": "ROWS",
+                                "startIndex": idx - 1,
+                                "endIndex": idx
+                            }
+                        }
+                    })
+                
+                if requests:
+                    sheet.spreadsheet.batch_update({"requests": requests})
+                print(f"[DEBUG] Batch cleaned up {len(indices)} rows for WF ID: {workflow_id}")
         except Exception as clean_err:
-             print(f"[WARN] Cleanup failed (non-critical): {str(clean_err)}")
+             print(f"[WARN] Batch cleanup failed: {str(clean_err)}")
 
         # Format date as YYYY-MM-DD
         timestamp = datetime.now().strftime('%Y-%m-%d')
