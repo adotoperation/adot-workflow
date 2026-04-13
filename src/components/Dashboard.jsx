@@ -47,6 +47,31 @@ const Dashboard = ({ user, onCreateNew, onOpenWorkflow, onLogout, onEditProfile 
     wf.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const handleDeleteWorkflow = async (e, workflowId, workflowName) => {
+    e.stopPropagation(); // Card click event prevent
+    if (!window.confirm(`'${workflowName}' 워크플로우를 정말로 삭제하시겠습니까?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/deleteWorkflow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.userId, workflowId })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        alert('삭제되었습니다.');
+        fetchWorkflows(); // Refresh list
+      } else {
+        alert(`삭제 실패: ${result.message}`);
+      }
+    } catch (err) {
+      console.error('Delete failed:', err);
+      alert('삭제 도중 오류가 발생했습니다.');
+    }
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return '알 수 없음';
     return dateStr; // Now using YYYY-MM-DD format from backend
@@ -139,7 +164,7 @@ const Dashboard = ({ user, onCreateNew, onOpenWorkflow, onLogout, onEditProfile 
                   <button className="open-btn" onClick={() => onOpenWorkflow(wf.id)}>
                     <ExternalLink size={16} /> 열기
                   </button>
-                  <button className="delete-btn">
+                  <button className="delete-btn" onClick={(e) => handleDeleteWorkflow(e, wf.id, wf.name)}>
                     <Trash2 size={16} />
                   </button>
                 </div>

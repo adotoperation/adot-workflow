@@ -268,6 +268,39 @@ def load_workflow():
         print(f"[ERROR] Load failed: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@app.route('/api/deleteWorkflow', methods=['POST'])
+def delete_workflow():
+    try:
+        data = request.json
+        user_id = data.get('userId')
+        workflow_id = data.get('workflowId')
+        
+        if not user_id or not workflow_id:
+            return jsonify({"status": "error", "message": "UserId and WorkflowId are required"}), 400
+            
+        client = get_gspread_client()
+        sheet = client.open_by_key(SPREADSHEET_ID).worksheet(WORKSHEET_NAME)
+        all_data = sheet.get_all_values()
+        
+        indices_to_delete = []
+        for idx, row in enumerate(all_data):
+            # Column B (index 1) is workflowId, Column C (index 2) is userId
+            if len(row) > 1 and row[1] == workflow_id and row[2] == user_id:
+                indices_to_delete.append(idx + 1)
+        
+        if not indices_to_delete:
+            return jsonify({"status": "error", "message": "Workflow not found or unauthorized"}), 404
+            
+        # Delete in reverse to keep indices valid
+        for idx in reversed(indices_to_delete):
+            sheet.delete_rows(idx)
+            
+        return jsonify({"status": "success", "message": f"Successfully deleted {len(indices_to_delete)} rows for Workflow {workflow_id}"})
+        
+    except Exception as e:
+        print(f"[ERROR] Delete failed: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/api/getTeams', methods=['GET'])
 def get_teams():
     try:
