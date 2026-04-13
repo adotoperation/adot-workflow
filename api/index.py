@@ -73,8 +73,28 @@ def save_workflow():
         nodes = flow_json.get('nodes', [])
         edges = flow_json.get('edges', [])
         
+        # Cleanup PREVIOUS version of this workflowId to prevent duplicates [Robust Addition]
+        try:
+            all_data = sheet.get_all_values()
+            # Find row indices to delete (Column B is index 1)
+            # We iterate in reverse to avoid index shifting during deletion
+            indices_to_delete = []
+            for idx, row in enumerate(all_data):
+                if len(row) > 1 and row[1] == workflow_id:
+                    indices_to_delete.append(idx + 1) # gspread is 1-indexed
+            
+            if indices_to_delete:
+                # Group contiguous indices if possible, or delete one by one in reverse
+                # For simplicity and reliability with smaller datasets:
+                for idx in reversed(indices_to_delete):
+                    sheet.delete_rows(idx)
+                print(f"[DEBUG] Cleaned up {len(indices_to_delete)} old rows for WF ID: {workflow_id}")
+        except Exception as clean_err:
+             print(f"[WARN] Cleanup failed (non-critical): {str(clean_err)}")
+
         # Format date as YYYY-MM-DD
         timestamp = datetime.now().strftime('%Y-%m-%d')
+        full_flow_json = json.dumps(flow_json) # For Column P [NEW]
         
         rows = []
         
@@ -94,10 +114,11 @@ def save_workflow():
                 node_data.get('person', ''),# I: 담당자
                 node_data.get('method', node_data.get('applicant', '')), # J: 방법/신청자
                 node_data.get('automation', '수동'), # K: 자동화
-                str(node_data.get('isStar', False)), # L: 고객접점여부 [NEW]
-                str(pos.get('x', 0)), # M: 위치 X [NEW]
-                str(pos.get('y', 0)), # N: 위치 Y [NEW]
-                "" # O: Target (Edges 전용)
+                str(node_data.get('isStar', False)), # L: 고객접점여부
+                str(pos.get('x', 0)), # M: 위치 X
+                str(pos.get('y', 0)), # N: 위치 Y
+                "",                  # O: Target (Edges 전용)
+                full_flow_json      # P: Master JSON [NEW]
             ]
             rows.append(row)
 
@@ -111,11 +132,12 @@ def save_workflow():
                 job_name,       # D: 제목
                 edge.get('id'), # E: 엣지 ID
                 "edge",         # F: 타입 고정
-                edge.get('source', ''), # G: Source ID [NEW]
-                edge.get('target', ''), # H: Target ID [NEW]
+                edge.get('source', ''), # G: Source ID
+                edge.get('target', ''), # H: Target ID
                 edge_data.get('method', ''), # I: 전달수단
                 edge_data.get('automation', '수동'), # J: 자동화 여부
-                "", "", "", "", "" # 나머지 공백
+                "", "", "", "", "", # K, L, M, N, O
+                full_flow_json      # P: Master JSON [NEW]
             ]
             rows.append(row)
 
@@ -166,8 +188,19 @@ def load_workflow():
         edges = []
         
         # Filter by userId and jobName (Column C and D)
+        wf_data_from_json = None
+        wf_id_found = None
+        
         for row in rows[1:]: # Skip header
-            if len(row) >= 11 and row[2] == user_id and row[3] == job_name:
+            if len(row) >= 4 and row[2] == user_id and row[3] == job_name:
+                wf_id_found = row[1]
+                # Check for Master JSON in Column P (index 15)
+                if len(row) > 15 and row[15] and not wf_data_from_json:
+                    try:
+                        wf_data_from_json = json.loads(row[15])
+                    except:
+                        pass
+                
                 type_val = row[5] # Column F
                 
                 if type_val == "edge":
@@ -199,12 +232,16 @@ def load_workflow():
                         node['data']['applicant'] = row[9]
                     nodes.append(node)
         
-        if nodes:
+        if nodes or wf_data_from_json:
+            # If we have Master JSON data, use it for 100% visual fidelity
+            final_flow_data = json.dumps(wf_data_from_json) if wf_data_from_json else json.dumps({"nodes": nodes, "edges": edges})
+            
             return jsonify({
                 "status": "success", 
                 "data": {
                     "jobName": job_name,
-                    "flowData": json.dumps({"nodes": nodes, "edges": edges})
+                    "workflowId": wf_id_found,
+                    "flowData": final_flow_data
                 }
             })
         else:
