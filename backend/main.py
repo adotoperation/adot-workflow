@@ -151,5 +151,5 @@ def get_teams():
         return jsonify({"status": "error", "message": f"데이터 로드 실패: {str(e)}"}), 500
 
 if __name__ == '__main__':
-    # Listen on all interfaces to allow internal host access
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Listen on all interfaces to allow internal host access, using port 5001 to avoid conflicts
+    app.run(host='0.0.0.0', port=5001, debug=True)
