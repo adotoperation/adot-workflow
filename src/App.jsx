@@ -280,20 +280,21 @@ export default function App() {
     setView(VIEW_EDITOR);
   };
 
-  const handleOpenWorkflow = async (jobName) => {
+  const handleOpenWorkflow = async (workflowId) => {
     try {
-      const response = await fetch(`/api/loadWorkflow?userId=${user.userId}&jobName=${jobName}`);
+      const response = await fetch(`/api/loadWorkflow?userId=${user.userId}&workflowId=${workflowId}`);
       const result = await response.json();
       if (result.status === 'success') {
         const flowData = JSON.parse(result.data.flowData);
         setEditingWorkflow({ 
-          name: jobName, 
+          name: result.data.jobName, 
           workflowId: result.data.workflowId, 
           ...flowData 
         });
         setView(VIEW_EDITOR);
       }
     } catch (err) {
+      console.error('불러오기 실패:', err);
       alert('불러오기 실패');
     }
   };

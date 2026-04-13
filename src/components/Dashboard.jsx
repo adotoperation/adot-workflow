@@ -27,12 +27,13 @@ const Dashboard = ({ user, onCreateNew, onOpenWorkflow, onLogout, onEditProfile 
       const response = await fetch(`/api/loadWorkflow?userId=${user.userId}`);
       const result = await response.json();
       if (result.status === 'success') {
-        // Transform { jobName: { flowData, updatedAt } } into array
-        const list = Object.entries(result.data).map(([name, detail]) => ({
-          name,
-          updatedAt: detail.updatedAt,
-          nodeCount: JSON.parse(detail.flowData).nodes.length
-        })).sort((a, b) => b.updatedAt - a.updatedAt);
+        // Backend now returns a list of objects: [{ jobName, updatedAt, workflowId, flowData }, ...]
+        const list = result.data.map((wf) => ({
+          id: wf.workflowId,
+          name: wf.jobName,
+          updatedAt: wf.updatedAt,
+          nodeCount: wf.flowData ? JSON.parse(wf.flowData).nodes.length : 0
+        })).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
         setWorkflows(list);
       }
     } catch (err) {
@@ -46,10 +47,9 @@ const Dashboard = ({ user, onCreateNew, onOpenWorkflow, onLogout, onEditProfile 
     wf.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const formatDate = (timestamp) => {
-    if (!timestamp) return '알 수 없음';
-    const date = new Date(timestamp * 1000); // Unix timestamp
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '알 수 없음';
+    return dateStr; // Now using YYYY-MM-DD format from backend
   };
 
   return (
@@ -113,7 +113,7 @@ const Dashboard = ({ user, onCreateNew, onOpenWorkflow, onLogout, onEditProfile 
           ) : (
             filteredWorkflows.map((wf, idx) => (
               <motion.div 
-                key={wf.name}
+                key={wf.id}
                 className="workflow-card"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -136,7 +136,7 @@ const Dashboard = ({ user, onCreateNew, onOpenWorkflow, onLogout, onEditProfile 
                 </div>
 
                 <div className="card-actions">
-                  <button className="open-btn" onClick={() => onOpenWorkflow(wf.name)}>
+                  <button className="open-btn" onClick={() => onOpenWorkflow(wf.id)}>
                     <ExternalLink size={16} /> 열기
                   </button>
                   <button className="delete-btn">

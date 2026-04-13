@@ -167,32 +167,49 @@ def load_workflow():
         if not user_id:
             return jsonify({"status": "error", "message": "UserId is required"}), 400
 
-        # If jobName is not provided, list all available workflows for this user
-        if not job_name:
+        # If workflowId or jobName is not provided, list all available workflows for this user
+        if not request.args.get('workflowId') and not request.args.get('jobName'):
             workflows = {}
             for row in all_rows:
                 # row[0]: date, row[1]: workflowId, row[2]: userId, row[3]: jobName
                 if len(row) >= 4 and row[2] == user_id:
-                    wf_name = row[3]
                     wf_id = row[1]
-                    if wf_name not in workflows:
-                        workflows[wf_name] = {
+                    wf_name = row[3]
+                    # We group by workflowId to ensure name changes are reflected as updates
+                    if wf_id not in workflows:
+                        workflows[wf_id] = {
+                            "jobName": wf_name,
                             "updatedAt": row[0],
                             "workflowId": wf_id,
                             "flowData": json.dumps({"nodes": []})
                         }
-            return jsonify({"status": "success", "data": workflows})
+                    else:
+                        # Update name if there's a more recent row (though deletion logic should prevent this)
+                        workflows[wf_id]["jobName"] = wf_name
+            
+            # Return as a list of workflows
+            return jsonify({"status": "success", "data": list(workflows.values())})
 
+        # Load specific workflow by workflowId (Primary) or jobName (Secondary)
         rows = sheet.get_all_values()
         nodes = []
         edges = []
         
-        # Filter by userId and jobName (Column C and D)
+        target_wf_id = request.args.get('workflowId')
+        target_job_name = request.args.get('jobName')
+        
         wf_data_from_json = None
         wf_id_found = None
         
         for row in rows[1:]: # Skip header
-            if len(row) >= 4 and row[2] == user_id and row[3] == job_name:
+            # Match by workflowId if provided, else fall back to userId + jobName
+            is_match = False
+            if target_wf_id:
+                is_match = (len(row) > 1 and row[1] == target_wf_id)
+            elif target_job_name:
+                is_match = (len(row) >= 4 and row[2] == user_id and row[3] == target_job_name)
+            
+            if is_match:
                 wf_id_found = row[1]
                 # Check for Master JSON in Column P (index 15)
                 if len(row) > 15 and row[15] and not wf_data_from_json:
