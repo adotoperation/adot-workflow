@@ -45,7 +45,9 @@ const Login = ({ onLoginSuccess, initialUser = null, isEditMode = false, onCance
     }
   };
 
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzsBfYx9KTTa840bvBiB1db46lzvW7xyrnkucszRIuHmGrp-y43BrL4VNZAPR1p5wo/exec'; 
+  // Backend API endpoints
+  const SIGNUP_URL = '/api/signup';
+  const CHECK_ID_URL = '/api/checkId';
 
   const checkIdDuplication = async () => {
     if (!userId) {
@@ -54,11 +56,10 @@ const Login = ({ onLoginSuccess, initialUser = null, isEditMode = false, onCance
     }
     setLoading(true);
     try {
-      const response = await fetch(SCRIPT_URL, {
+      const response = await fetch(CHECK_ID_URL, {
         method: 'POST',
-        mode: 'cors',
-        body: JSON.stringify({ action: 'checkId', userId }),
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
       });
       const result = await response.json();
       if (result.result === 'success') {
@@ -66,7 +67,7 @@ const Login = ({ onLoginSuccess, initialUser = null, isEditMode = false, onCance
         setSuccess('사용 가능한 아이디입니다.');
         setError('');
       } else {
-        setError('이미 사용 중인 아이디입니다.');
+        setError(result.message || '이미 사용 중인 아이디입니다.');
         setIsIdChecked(false);
       }
     } catch (err) {
@@ -85,15 +86,50 @@ const Login = ({ onLoginSuccess, initialUser = null, isEditMode = false, onCance
     }
     setLoading(true);
     
-    // 로컬 시뮬레이션: 0.5초 후 로그인 성공
-    setTimeout(() => {
-      onLoginSuccess({ 
-        userId, 
-        name: name || userId, 
-        team: team || '운영팀' 
-      });
-      setLoading(false);
-    }, 500);
+    if (!isLogin) {
+      if (!isIdChecked) {
+        setError('아이디 중복 확인을 해주세요.');
+        setLoading(false);
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('비밀번호가 일치하지 않습니다.');
+        setLoading(false);
+        return;
+      }
+
+      // Actual Signup
+      const registerUser = async () => {
+        try {
+          const response = await fetch(SIGNUP_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ team, name, userId, password, email }),
+          });
+          const result = await response.json();
+          if (result.status === 'success') {
+            onLoginSuccess({ userId, name, team });
+          } else {
+            setError(`회원가입 실패: ${result.message}`);
+          }
+        } catch (err) {
+          setError(`회원가입 중 오류가 발생했습니다: ${err.message}`);
+        } finally {
+          setLoading(false);
+        }
+      };
+      registerUser();
+    } else {
+      // Login simulation (Keep for now or implement /api/login later)
+      setTimeout(() => {
+        onLoginSuccess({ 
+          userId, 
+          name: name || userId, 
+          team: team || '운영팀' 
+        });
+        setLoading(false);
+      }, 500);
+    }
   };
 
   const toggleAuthMode = () => {

@@ -171,6 +171,45 @@ def get_teams():
         print(f"[ERROR] Fetch teams failed: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@app.route('/api/signup', methods=['POST'])
+def signup():
+    try:
+        data = request.json
+        client = get_gspread_client()
+        sheet = client.open_by_key(SPREADSHEET_ID).worksheet("회원정보")
+        
+        # A: 팀명, B: 이름, C: 아이디, D: 비밀번호, E: 사내 이메일
+        row = [
+            data.get('team'),
+            data.get('name'),
+            data.get('userId'),
+            data.get('password'),
+            data.get('email')
+        ]
+        
+        sheet.append_row(row)
+        return jsonify({"status": "success", "message": "Signup successful"})
+    except Exception as e:
+        print(f"[ERROR] Signup failed: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/checkId', methods=['POST'])
+def check_id():
+    try:
+        user_id = request.json.get('userId')
+        client = get_gspread_client()
+        sheet = client.open_by_key(SPREADSHEET_ID).worksheet("회원정보")
+        
+        # Get all IDs from column C (3rd column)
+        ids = sheet.col_values(3)
+        
+        if user_id in ids:
+            return jsonify({"result": "fail", "message": "ID already exists"})
+        return jsonify({"result": "success", "message": "ID available"})
+    except Exception as e:
+        print(f"[ERROR] ID check failed: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 # Vercel requires the app instance to be named 'app'
 if __name__ == '__main__':
     app.run(port=5001, debug=True)
